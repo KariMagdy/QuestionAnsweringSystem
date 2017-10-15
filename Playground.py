@@ -18,6 +18,8 @@ import numpy as np
 import re
 from tensorflow.python.platform import gfile
 from os.path import join as pjoin
+from keras.utils import to_categorical
+
 
 
 dataDir = '/Users/KarimM/GoogleDrive/PhD/Courses/Deep_Learning/Project/data/squad/'
@@ -107,6 +109,13 @@ embedding_layer_Query = Embedding(num_words,
                             input_length=Max_Query_Length,
                             trainable=False)
 
+# Label for start as hotvector [[[Edit for start and end properly]]]
+labels = np.zeros([len(contexts),Max_Context_Length])
+for idx, start in enumerate(answerSpan[:,0]):
+    labels[idx,start] = 1
+labels = to_categorical(np.asarray(answerSpan[:,0]))
+
+
 print('Training model.')
 
 # train a 1D convnet with global maxpooling
@@ -115,6 +124,25 @@ Query_input = Input(shape=(Max_Query_Length,), dtype='int32')
 embedded_Context = embedding_layer_Context(Context_input)
 embedded_Query = embedding_layer_Query(Query_input)
 
+# LSTM layer for both question and query
+contextLstm = Bidirectional(LSTM(64))(embedded_Context)
+queryLstm = Bidirectional(LSTM(64))(embedded_Query)
+
+
+# Concatenating output and input and passing to a dense layer
+aggregated = keras.layers.Concatenate([contextLstm,queryLstm])
+aggregated = Dense(1000)(aggregated)
+answer = Dense(Max_Context_Length)(aggregated)
+answer = Activation('softmax')(answer)
+model = Model([contexts, queries], labels)
+model.compile(loss='categorical_crossentropy',
+              optimizer='rmsprop',
+              metrics=['acc'])
+model.fit(x_train, y_train,
+          batch_size=128,
+          epochs=10,
+
+"""
 x = Conv1D(128, 5, activation='relu')(embedded_sequences)
 x = MaxPooling1D(5)(x)
 x = Conv1D(128, 5, activation='relu')(x)
@@ -134,3 +162,4 @@ model.fit(x_train, y_train,
           batch_size=128,
           epochs=10,
 validation_data=(x_val, y_val))
+"""
