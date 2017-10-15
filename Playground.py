@@ -19,6 +19,10 @@ import re
 from tensorflow.python.platform import gfile
 from os.path import join as pjoin
 from keras.utils import to_categorical
+from keras.utils import to_categorical
+from keras.layers import Dense, Input, Flatten, concatenate
+from keras.layers import Conv1D, MaxPooling1D, Embedding,Bidirectional,LSTM
+from keras.models import Model
 
 
 
@@ -86,7 +90,7 @@ print('Shape of answers tensor:', answerSpan.shape)
 
 
 # prepare embedding matrix [[[Use all vocab????]]]
-num_words = min(MAX_NB_WORDS, len(vocab))
+num_words = len(vocab)
 embedding_matrix = np.zeros((num_words, EMBEDDING_DIM))
 for word, i in vocab.items():
     if i >= MAX_NB_WORDS:
@@ -113,8 +117,6 @@ embedding_layer_Query = Embedding(num_words,
 labels = np.zeros([len(contexts),Max_Context_Length])
 for idx, start in enumerate(answerSpan[:,0]):
     labels[idx,start] = 1
-labels = to_categorical(np.asarray(answerSpan[:,0]))
-
 
 print('Training model.')
 
@@ -130,18 +132,17 @@ queryLstm = Bidirectional(LSTM(64))(embedded_Query)
 
 
 # Concatenating output and input and passing to a dense layer
-aggregated = keras.layers.Concatenate([contextLstm,queryLstm])
-aggregated = Dense(1000)(aggregated)
+aggregated = concatenate([contextLstm,queryLstm],axis = -1)
+aggregated = Dense(1000, activation='relu')(aggregated)
 answer = Dense(Max_Context_Length)(aggregated)
 answer = Activation('softmax')(answer)
-model = Model([contexts, queries], labels)
+model = Model([Context_input, Query_input], answer)
 model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['acc'])
-model.fit(x_train, y_train,
+history = model.fit([contexts[:1000,:], queries[:1000,:]], labels[:1000],
           batch_size=128,
-          epochs=10,
-
+          epochs=10,validation_data=([contexts[1000:1500,:], queries[1000:1500,:]], labels[1000:1500]))
 """
 x = Conv1D(128, 5, activation='relu')(embedded_sequences)
 x = MaxPooling1D(5)(x)
