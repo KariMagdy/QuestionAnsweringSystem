@@ -6,23 +6,14 @@ Created on Sat Sep 30 13:24:17 2017
 from __future__ import print_function
 
 import os
-from keras.models import Sequential, Model
-from keras.layers.embeddings import Embedding
-from keras.layers import Input, Activation, Dense, Permute, Dropout, add, dot, concatenate
-from keras.layers import LSTM
-from keras.utils.data_utils import get_file
-from keras.preprocessing.sequence import pad_sequences
-from functools import reduce
-import tarfile
 import numpy as np
-import re
+from keras.models import Model
+from keras.layers.embeddings import Embedding
+from keras.layers import Input, Activation, Dense, Dropout, concatenate
+from keras.preprocessing.sequence import pad_sequences
 from tensorflow.python.platform import gfile
 from os.path import join as pjoin
-from keras.utils import to_categorical
-from keras.utils import to_categorical
-from keras.layers import Dense, Input, Flatten, concatenate
-from keras.layers import Conv1D, MaxPooling1D, Embedding,Bidirectional,LSTM
-from keras.models import Model
+from keras.layers import Embedding,Bidirectional,LSTM
 
 
 
@@ -30,6 +21,7 @@ dataDir = '/Users/KarimM/GoogleDrive/PhD/Courses/Deep_Learning/Project/data/squa
 GLOVE_DIR = '/Users/KarimM/data/glove/'
 EMBEDDING_DIM = 100
 MAX_NB_WORDS = 20000
+VALIDATION_SPLIT = 0.2
 
 
 def initialize_vocabulary(vocabulary_path):
@@ -83,7 +75,6 @@ print('Found %s contexts.' % len(contexts))
 contexts = pad_sequences(contexts, maxlen=Max_Context_Length)
 queries = pad_sequences(queries, maxlen=Max_Query_Length)
 
-
 print('Shape of context tensor:', contexts.shape)
 print('Shape of query tensor:', queries.shape)
 print('Shape of answers tensor:', answerSpan.shape)
@@ -118,6 +109,21 @@ labels = np.zeros([len(contexts),Max_Context_Length])
 for idx, start in enumerate(answerSpan[:,0]):
     labels[idx,start] = 1
 
+# split the data into a training set and a validation set
+indices = np.arange(contexts.shape[0])
+np.random.shuffle(indices)
+contexts = contexts[indices]
+queries = queries[indices]
+labels = labels[indices]
+num_validation_samples = int(VALIDATION_SPLIT * contexts.shape[0])
+
+contexts_train = contexts[:-num_validation_samples,:]
+queries_train = queries[:-num_validation_samples,:]
+labels_train = labels[:-num_validation_samples]
+contexts_val = contexts[-num_validation_samples:,:]
+queries_val = queries[-num_validation_samples:,:]
+labels_val = labels[-num_validation_samples:]
+
 print('Training model.')
 
 # train a 1D convnet with global maxpooling
@@ -140,9 +146,19 @@ model = Model([Context_input, Query_input], answer)
 model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['acc'])
-history = model.fit([contexts[:1000,:], queries[:1000,:]], labels[:1000],
+history = model.fit([contexts_train, queries_train], labels_train,
           batch_size=128,
-          epochs=10,validation_data=([contexts[1000:1500,:], queries[1000:1500,:]], labels[1000:1500]))
+          epochs=2,validation_data=([contexts_val, queries_val], labels_val))
+
+# serialize model to JSON
+model_json = model.to_json()
+with open("model.json", "w") as json_file:
+    json_file.write(model_json)
+# serialize weights to HDF5
+model.save_weights("model.h5")
+print("Saved model to disk")
+
+
 """
 x = Conv1D(128, 5, activation='relu')(embedded_sequences)
 x = MaxPooling1D(5)(x)
