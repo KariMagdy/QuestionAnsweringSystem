@@ -14,10 +14,12 @@ from keras.preprocessing.sequence import pad_sequences
 from tensorflow.python.platform import gfile
 from os.path import join as pjoin
 from keras.layers import Embedding,Bidirectional,LSTM
-
+from keras.models import model_from_json
+import pickle
 
 
 dataDir = '/Users/KarimM/GoogleDrive/PhD/Courses/Deep_Learning/Project/data/squad/'
+ModelDir = '/Users/KarimM/GoogleDrive/PhD/Courses/Deep_Learning/Project/QuestionAnsweringSystem/'
 GLOVE_DIR = '/Users/KarimM/data/glove/'
 EMBEDDING_DIM = 100
 MAX_NB_WORDS = 20000
@@ -105,78 +107,76 @@ embedding_layer_Query = Embedding(num_words,
                             trainable=False)
 
 # Label for start as hotvector [[[Edit for start and end properly]]]
-labels = np.zeros([len(contexts),Max_Context_Length])
+labelsStart = np.zeros([len(contexts),Max_Context_Length])
+labelsEnd = np.zeros([len(contexts),Max_Context_Length])
 for idx, start in enumerate(answerSpan[:,0]):
-    labels[idx,start] = 1
+    labelsStart[idx,start] = 1
+for idx, end in enumerate(answerSpan[:,1]):
+    labelsEnd[idx,end] = 1
 
 # split the data into a training set and a validation set
 indices = np.arange(contexts.shape[0])
 np.random.shuffle(indices)
 contexts = contexts[indices]
 queries = queries[indices]
-labels = labels[indices]
+labelsStart = labelsStart[indices]
+labelsEnd = labelsEnd[indices]
 num_validation_samples = int(VALIDATION_SPLIT * contexts.shape[0])
 
 contexts_train = contexts[:-num_validation_samples,:]
 queries_train = queries[:-num_validation_samples,:]
-labels_train = labels[:-num_validation_samples]
+labelsStart_train = labelsStart[:-num_validation_samples]
+labelsEnd_train = labelsEnd[:-num_validation_samples]
 contexts_val = contexts[-num_validation_samples:,:]
 queries_val = queries[-num_validation_samples:,:]
-labels_val = labels[-num_validation_samples:]
+labelsStart_val = labelsStart[-num_validation_samples:]
+labelsEnd_val = labelsEnd[-num_validation_samples:]
+
+
+# load json and create model
+if path(ModelDir + 'model.json').exists():
+    json_file = open(ModelDir + 'model.json', 'r')
+    loaded_model_json = json_file.read()
+    json_file.close()
+    model = model_from_json(loaded_model_json)
+    # load weights into new model
+    model.load_weights(ModelDir + "model.h5")
+    print("Loaded model from disk")
+else:   
+    print("Not model found on disk - Inititalizing new model")
+    Context_input = Input(shape=(Max_Context_Length,), dtype='int32')
+    Query_input = Input(shape=(Max_Query_Length,), dtype='int32')
+    embedded_Context = embedding_layer_Context(Context_input)
+    embedded_Query = embedding_layer_Query(Query_input)
+    
+    # LSTM layer for both question and query
+    contextLstm = Bidirectional(LSTM(64))(embedded_Context)
+    queryLstm = Bidirectional(LSTM(64))(embedded_Query)
+       
+    # Concatenating output and input and passing to a dense layer
+    aggregated = concatenate([contextLstm,queryLstm],axis = -1)
+    aggregated = Dense(1000, activation='relu')(aggregated)
+    answerStart = Dense(Max_Context_Length)(aggregated)
+    answerStart = Activation('softmax')(answerStart)
+    answerEnd = concatenate([aggregated,answerStart])
+    answerEnd = Dense(Max_Context_Length)(answerEnd)
+    answerEnd = Activation('softmax')(answerEnd)
+    model = Model([Context_input, Query_input], [answerStart,answerEnd])
 
 print('Training model.')
-
-# train a 1D convnet with global maxpooling
-Context_input = Input(shape=(Max_Context_Length,), dtype='int32')
-Query_input = Input(shape=(Max_Query_Length,), dtype='int32')
-embedded_Context = embedding_layer_Context(Context_input)
-embedded_Query = embedding_layer_Query(Query_input)
-
-# LSTM layer for both question and query
-contextLstm = Bidirectional(LSTM(64))(embedded_Context)
-queryLstm = Bidirectional(LSTM(64))(embedded_Query)
-
-
-# Concatenating output and input and passing to a dense layer
-aggregated = concatenate([contextLstm,queryLstm],axis = -1)
-aggregated = Dense(1000, activation='relu')(aggregated)
-answer = Dense(Max_Context_Length)(aggregated)
-answer = Activation('softmax')(answer)
-model = Model([Context_input, Query_input], answer)
 model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['acc'])
-history = model.fit([contexts_train, queries_train], labels_train,
+history = model.fit([contexts_train, queries_train], [labelsStart_train,labelsEnd_train],
           batch_size=128,
-          epochs=2,validation_data=([contexts_val, queries_val], labels_val))
+          epochs=2,validation_data=([contexts_val, queries_val], [labelsStart_val,labelsEnd_val]))
 
 # serialize model to JSON
 model_json = model.to_json()
-with open("model.json", "w") as json_file:
+with open(ModelDir + "model.json", "w") as json_file:
     json_file.write(model_json)
 # serialize weights to HDF5
-model.save_weights("model.h5")
+model.save_weights(ModelDir +"model.h5")
 print("Saved model to disk")
 
-
-"""
-x = Conv1D(128, 5, activation='relu')(embedded_sequences)
-x = MaxPooling1D(5)(x)
-x = Conv1D(128, 5, activation='relu')(x)
-x = MaxPooling1D(5)(x)
-x = Conv1D(128, 5, activation='relu')(x)
-x = MaxPooling1D(35)(x)
-x = Flatten()(x)
-x = Dense(128, activation='relu')(x)
-preds = Dense(len(labels_index), activation='softmax')(x)
-
-model = Model(sequence_input, preds)
-model.compile(loss='categorical_crossentropy',
-              optimizer='rmsprop',
-              metrics=['acc'])
-
-model.fit(x_train, y_train,
-          batch_size=128,
-          epochs=10,
-validation_data=(x_val, y_val))
-"""
+#pickle.dump(history, open( "history.p", "wb" ) )
