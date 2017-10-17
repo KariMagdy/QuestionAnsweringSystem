@@ -6,6 +6,7 @@ Created on Sat Sep 30 13:24:17 2017
 from __future__ import print_function
 
 import os
+import os.path
 import numpy as np
 from keras.models import Model
 from keras.layers.embeddings import Embedding
@@ -17,10 +18,9 @@ from keras.layers import Embedding,Bidirectional,LSTM
 from keras.models import model_from_json
 import pickle
 
-
-dataDir = '/Users/KarimM/GoogleDrive/PhD/Courses/Deep_Learning/Project/data/squad/'
-ModelDir = '/Users/KarimM/GoogleDrive/PhD/Courses/Deep_Learning/Project/QuestionAnsweringSystem/'
-GLOVE_DIR = '/Users/KarimM/data/glove/'
+ModelDir = os.path.dirname(os.path.realpath(__file__))
+dataDir = os.path.join(ModelDir ,'../data/squad/')
+GLOVE_DIR = os.path.join(ModelDir ,'../data/glove/') 
 EMBEDDING_DIM = 100
 MAX_NB_WORDS = 20000
 VALIDATION_SPLIT = 0.2
@@ -134,7 +134,7 @@ labelsEnd_val = labelsEnd[-num_validation_samples:]
 
 
 # load json and create model
-if path(ModelDir + 'model.json').exists():
+if os.path.exists(ModelDir + 'model.json'):
     json_file = open(ModelDir + 'model.json', 'r')
     loaded_model_json = json_file.read()
     json_file.close()
@@ -169,7 +169,7 @@ model.compile(loss='categorical_crossentropy',
               metrics=['acc'])
 history = model.fit([contexts_train, queries_train], [labelsStart_train,labelsEnd_train],
           batch_size=128,
-          epochs=2,validation_data=([contexts_val, queries_val], [labelsStart_val,labelsEnd_val]))
+          epochs=10,validation_data=([contexts_val, queries_val], [labelsStart_val,labelsEnd_val]))
 
 # serialize model to JSON
 model_json = model.to_json()
@@ -179,4 +179,9 @@ with open(ModelDir + "model.json", "w") as json_file:
 model.save_weights(ModelDir +"model.h5")
 print("Saved model to disk")
 
+with open('history.txt','a') as f:
+    for line in history.history:
+        f.write(line+'\n')
+
+    
 #pickle.dump(history, open( "history.p", "wb" ) )
