@@ -28,7 +28,7 @@ def setup_args():
     parser = argparse.ArgumentParser()
     code_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)))
     vocab_dir = os.path.join("data", "squad")
-    glove_dir = os.path.join("download", "dwr")
+    glove_dir = os.path.join("data", "dwr")
     source_dir = os.path.join("data", "squad")
     parser.add_argument("--source_dir", default=source_dir)
     parser.add_argument("--glove_dir", default=glove_dir)

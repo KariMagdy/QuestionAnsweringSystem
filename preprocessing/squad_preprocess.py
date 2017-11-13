@@ -41,29 +41,6 @@ def reporthook(t):
     last_b[0] = b
   return inner
 
-def maybe_download(url, filename, prefix, num_bytes=None):
-    """Takes an URL, a filename, and the expected bytes, download
-    the contents and returns the filename
-    num_bytes=None disables the file size check."""
-    local_filename = None
-    if not os.path.exists(os.path.join(prefix, filename)):
-        try:
-            print("Downloading file {}...".format(url + filename))
-            with tqdm(unit='B', unit_scale=True, miniters=1, desc=filename) as t:
-                local_filename, _ = urlretrieve(url + filename, os.path.join(prefix,filename), reporthook=reporthook(t))
-        except AttributeError as e:
-            print("An error occurred when downloading the file! Please get the dataset using a browser.")
-            raise e
-    # We have a downloaded file
-    # Check the stats and make sure they are ok
-    file_stats = os.stat(os.path.join(prefix,filename))
-    if num_bytes is None or file_stats.st_size == num_bytes:
-        print("File {} successfully loaded".format(filename))
-    else:
-        raise Exception("Unexpected dataset size. Please get the dataset using a browser.")
-
-    return local_filename
-
 
 def data_from_json(filename):
     with open(filename) as data_file:
@@ -192,21 +169,16 @@ def split_tier(prefix, train_percentage = 0.9, shuffle=False):
 
 if __name__ == '__main__':
 
-    download_prefix = os.path.join("download", "squad")
+    download_prefix = os.path.join("raw_data")
     data_prefix = os.path.join("data", "squad")
 
-    print("Downloading datasets into {}".format(download_prefix))
     print("Preprocessing datasets into {}".format(data_prefix))
 
-    if not os.path.exists(download_prefix):
-        os.makedirs(download_prefix)
     if not os.path.exists(data_prefix):
         os.makedirs(data_prefix)
 
     train_filename = "train.json"
     dev_filename = "test.json"
-
-    #maybe_download(squad_base_url, train_filename, download_prefix)
 
     train_data = data_from_json(os.path.join(download_prefix, train_filename))
 
@@ -215,19 +187,16 @@ if __name__ == '__main__':
     # In train we have 87k+ questions, and one answer per question.
     # The answer start range is also indicated
 
+    print("Processed {} questions and {} answers in train".format(train_num_questions, train_num_answers))
+
     # 1. Split train into train and validation into 95-5
     # 2. Shuffle train, validation
     print("Splitting the dataset into train and validation")
     split_tier(data_prefix, 0.95, shuffle=True)
-
-    print("Processed {} questions and {} answers in train".format(train_num_questions, train_num_answers))
-
-    #print("Downloading {}".format(dev_filename))
-    #dev_dataset = maybe_download(squad_base_url, dev_filename, download_prefix)
-
+    
     # In dev, we have 10k+ questions, and around 3 answers per question (totaling
     # around 34k+ answers).
     #dev_data = data_from_json(os.path.join(download_prefix, dev_filename))
     #list_topics(dev_data)
     #dev_num_questions, dev_num_answers = read_write_dataset(dev_data, "dev", data_prefix)
-    #print("Processed {} questions and {} answers in dev".format(dev_num_questions, dev_num_answers))
+    #print("Processed {} questions and {} answers in test".format(dev_num_questions, dev_num_answers))
