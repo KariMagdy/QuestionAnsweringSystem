@@ -1,7 +1,7 @@
 # QuestionAnsweringSystem
 A system for automatically answering questions. This project is part of CS5224 class and works on the dataset provided in the Kaggle competition for the class. 
 
-#Getting started
+# Getting started
 1. Start by downloading the data and copying it in the raw_data/ directory. 
 2. Run get_started.sh, which will preprocess the data and download the required GloVe files
 3. Run qa_data to create word vector representation for the dataset
