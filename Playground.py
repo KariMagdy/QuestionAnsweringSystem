@@ -17,6 +17,7 @@ from os.path import join as pjoin
 from keras.layers import Embedding,Bidirectional,LSTM
 from keras.models import model_from_json
 import pickle
+import argparse
 
 ModelDir = os.path.dirname(os.path.realpath(__file__))
 dataDir = os.path.join(ModelDir ,'../data/squad/')
@@ -169,7 +170,7 @@ model.compile(loss='categorical_crossentropy',
               metrics=['acc'])
 history = model.fit([contexts_train, queries_train], [labelsStart_train,labelsEnd_train],
           batch_size=128,
-          epochs=10,validation_data=([contexts_val, queries_val], [labelsStart_val,labelsEnd_val]))
+          epochs=20,validation_data=([contexts_val, queries_val], [labelsStart_val,labelsEnd_val]))
 
 # serialize model to JSON
 model_json = model.to_json()
@@ -178,10 +179,21 @@ with open(ModelDir + "model.json", "w") as json_file:
 # serialize weights to HDF5
 model.save_weights(ModelDir +"model.h5")
 print("Saved model to disk")
-
-with open('history.txt','a') as f:
-    for line in history.history:
-        f.write(line+'\n')
-
+        
+with open('trainHistoryDict', 'wb') as file_pi:
+    pickle.dump(history.history, file_pi)
     
-#pickle.dump(history, open( "history.p", "wb" ) )
+#with open('trainHistoryDict', 'rb') as f:
+#   historyRecord = pickle.load(f)
+
+
+
+def parse_arguments(argv):
+    parser = argparse.ArgumentParser()
+    
+    parser.add_argument('data_dir', type=str,
+        help='Path to the data directory containing training dataset.')
+    return parser.parse_args(argv)
+
+if __name__ == '__main__':
+    train(parse_arguments(sys.argv[1:]))

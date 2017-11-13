@@ -1,0 +1,10 @@
+loss
+val_activation_2_loss
+activation_2_acc
+activation_1_acc
+val_activation_1_loss
+activation_2_loss
+activation_1_loss
+val_activation_2_acc
+val_loss
+val_activation_1_acc
